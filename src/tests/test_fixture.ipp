@@ -188,7 +188,7 @@ protected:
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
         // Use app1 to add Server 3
-        auto add2 = app_1_->instance_->add_member(group_id_, app_2_->id_);
+        auto add2 = app_1_->instance_->add_member(group_id_, app_2_->id_, "aux_app2", false, 50);
         std::this_thread::sleep_for(std::chrono::seconds(1));
         EXPECT_TRUE(std::move(add2).get());
 

@@ -165,7 +165,7 @@ TEST_F(DataServiceFixture, BasicTest2) {
     auto peer_info = repl_ctx->get_raft_status();
     EXPECT_TRUE(peer_info.size() == 3);
     for (auto const& peer : peer_info) {
-        std::cout << "Peer ID: " << peer.id_ << " Last Log Idx: " << peer.last_log_idx_
+        std::cout << "Peer ID: " << peer.id_ << " Priority: " << peer.priority << " Last Log Idx: " << peer.last_log_idx_
                   << " Last Succ Resp Us: " << peer.last_succ_resp_us_ << std::endl;
         EXPECT_TRUE(peer.id_ == to_string(app_1_->id_) || peer.id_ == to_string(app_2_->id_) ||
                     peer.id_ == to_string(app_3_->id_));

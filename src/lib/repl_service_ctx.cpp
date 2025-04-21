@@ -97,8 +97,10 @@ std::vector< peer_info > repl_service_ctx::get_raft_status() const {
         // get all the peer info except the leader
         for (auto const& pinfo : pinfo_all) {
             std::string_view peer_id;
+            int32_t priority = 1;
             if (auto srv_config = _server->get_srv_config(pinfo.id_); nullptr != srv_config) {
                 peer_id = srv_config->get_endpoint();
+                priority = srv_config->get_priority();
             }
             if (peer_id.empty()) {
                 // if remove_member case , leader will first remove the member from peer_list, and then apply the new
@@ -108,7 +110,7 @@ std::vector< peer_info > repl_service_ctx::get_raft_status() const {
                 continue;
             }
 
-            peers.emplace_back(std::string(peer_id), pinfo.last_log_idx_, pinfo.last_succ_resp_us_);
+            peers.emplace_back(std::string(peer_id), priority, pinfo.last_log_idx_, pinfo.last_succ_resp_us_);
         }
     }
 
@@ -118,10 +120,11 @@ std::vector< peer_info > repl_service_ctx::get_raft_status() const {
     // tries to get the raft status
     if (my_config) {
         auto my_peer_id = my_config->get_endpoint();
+        auto priority = my_config->get_priority();
 
         // add the peer info of itself(leader or follower) , which is useful for upper layer
         // from the view of a node itself, last_succ_resp_us_ make no sense, so set it to 0
-        peers.emplace_back(my_peer_id, _server->get_last_log_idx(), 0);
+        peers.emplace_back(my_peer_id, priority, _server->get_last_log_idx(), 0);
     }
 
     return peers;

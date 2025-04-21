@@ -33,6 +33,8 @@ struct replica_config {
 struct peer_info {
     // Peer ID.
     std::string id_;
+    // Leader priority
+    int32_t priority;
     // The last log index that the peer has, from this server's point of view.
     uint64_t last_log_idx_;
     // The elapsed time since the last successful response from this peer, set to 0 on leader
