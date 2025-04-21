@@ -79,7 +79,8 @@ public:
                                   std::shared_ptr< mesg_state_mgr >) = 0;
 
     // Send a client request to the cluster
-    virtual NullAsyncResult add_member(group_id_t const& group_id, peer_id_t const& server_id) = 0;
+    virtual NullAsyncResult add_member(group_id_t const& group_id, peer_id_t const& server_id,
+                                       std::string const& aux = "", bool is_learner = false, int32_t priority = 1) = 0;
     virtual NullAsyncResult rem_member(group_id_t const& group_id, peer_id_t const& server_id) = 0;
     virtual NullAsyncResult become_leader(group_id_t const& group_id) = 0;
     virtual NullAsyncResult append_entries(group_id_t const& group_id,

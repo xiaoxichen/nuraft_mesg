@@ -70,7 +70,8 @@ public:
     NullResult join_group(group_id_t const& group_id, group_type_t const& group_type,
                           std::shared_ptr< mesg_state_mgr > smgr) override;
 
-    NullAsyncResult add_member(group_id_t const& group_id, peer_id_t const& server_id) override;
+    NullAsyncResult add_member(group_id_t const& group_id, peer_id_t const& server_id, std::string const& aux = "",
+                               bool is_learner = false, int32_t priority = 1) override;
     NullAsyncResult rem_member(group_id_t const& group_id, peer_id_t const& server_id) override;
     NullAsyncResult become_leader(group_id_t const& group_id) override;
     NullAsyncResult append_entries(group_id_t const& group_id,

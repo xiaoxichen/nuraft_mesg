@@ -70,7 +70,9 @@ ManagerImpl::ManagerImpl(Manager::Params const& start_params, std::weak_ptr< Mes
     // This exception is only expected in this case where we "restart" the server by just recreating the instance.
     try {
         _custom_logger = sisl::logging::CreateCustomLogger(logger_name, "", false, false /* tee_to_stdout_stderr */);
-    } catch (spdlog::spdlog_ex const& e) { _custom_logger = spdlog::details::registry::instance().get(logger_name); }
+    } catch (spdlog::spdlog_ex const& e) {
+        _custom_logger = spdlog::details::registry::instance().get(logger_name);
+    }
 
     sisl::logging::SetLogPattern("[%D %T.%f] [%^%L%$] [%t] %v", _custom_logger);
     nuraft::ptr< nuraft::logger > logger =
@@ -124,17 +126,19 @@ void ManagerImpl::register_mgr_type(group_type_t const& group_type, group_params
     auto [it, happened] = _state_mgr_types.emplace(std::make_pair(group_type, params));
     DEBUG_ASSERT(_state_mgr_types.end() != it, "Out of memory?");
     DEBUG_ASSERT(!!happened, "Re-register?");
-    if (_state_mgr_types.end() == it) { LOGE("Could not register [group_type={}]", group_type); }
+    if (_state_mgr_types.end() == it) {
+        LOGE("Could not register [group_type={}]", group_type);
+    }
 }
 
-void ManagerImpl::generic_raft_event_handler(group_id_t const& group_id,
-                                             nuraft::cb_func::Type type,
+void ManagerImpl::generic_raft_event_handler(group_id_t const& group_id, nuraft::cb_func::Type type,
                                              nuraft::cb_func::Param* param) {
     auto const& my_id = param->myId;
     auto const& leader_id = param->leaderId;
     switch (type) {
     case nuraft::cb_func::RemovedFromCluster: {
-        LOGI("[srv_id={}] evicted from: [group={}, leader_id:{}, my_id:{}]", start_params_.server_uuid_, group_id, leader_id, my_id);
+        LOGI("[srv_id={}] evicted from: [group={}, leader_id:{}, my_id:{}]", start_params_.server_uuid_, group_id,
+             leader_id, my_id);
         exit_group(group_id);
     } break;
     case nuraft::cb_func::JoinedCluster: {
@@ -146,11 +150,13 @@ void ManagerImpl::generic_raft_event_handler(group_id_t const& group_id,
         }
     } break;
     case nuraft::cb_func::NewConfig: {
-        LOGD("[srv_id={}] saw cluster change: [group={}, leader_id:{}, my_id:{}]", start_params_.server_uuid_, group_id, leader_id, my_id);
+        LOGD("[srv_id={}] saw cluster change: [group={}, leader_id:{}, my_id:{}]", start_params_.server_uuid_, group_id,
+             leader_id, my_id);
         _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeLeader: {
-        LOGI("[srv_id={}] became leader: [group={}, leader_id:{}, my_id:{}]!", start_params_.server_uuid_, group_id, leader_id, my_id);
+        LOGI("[srv_id={}] became leader: [group={}, leader_id:{}, my_id:{}]!", start_params_.server_uuid_, group_id,
+             leader_id, my_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = true;
@@ -158,7 +164,8 @@ void ManagerImpl::generic_raft_event_handler(group_id_t const& group_id,
         _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeFollower: {
-        LOGI("[srv_id={}] following: [group={}, leader_id:{}, my_id:{}]!", start_params_.server_uuid_, group_id, leader_id, my_id);
+        LOGI("[srv_id={}] following: [group={}, leader_id:{}, my_id:{}]!", start_params_.server_uuid_, group_id,
+             leader_id, my_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = false;
@@ -179,7 +186,9 @@ void ManagerImpl::exit_group(group_id_t const& group_id) {
     std::shared_ptr< mesg_state_mgr > mgr;
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
-        if (auto it = _state_managers.find(group_id); it != _state_managers.end()) { mgr = it->second; }
+        if (auto it = _state_managers.find(group_id); it != _state_managers.end()) {
+            mgr = it->second;
+        }
     }
     if (mgr) mgr->leave();
 }
@@ -229,16 +238,24 @@ nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t
     ctx = new nuraft::context(base_smgr, sm, listener, logger, rpc_cli_factory, _scheduler, params);
     ctx->set_cb_func([wp = std::weak_ptr< mesg_state_mgr >(smgr), group_id](nuraft::cb_func::Type type,
                                                                             nuraft::cb_func::Param* param) {
-        if (auto sp = wp.lock(); sp) { return sp->internal_raft_event_handler(group_id, type, param); }
+        if (auto sp = wp.lock(); sp) {
+            return sp->internal_raft_event_handler(group_id, type, param);
+        }
         return nuraft::cb_func::Ok;
     });
 
     return nuraft::cmd_result_code::OK;
 }
 
-NullAsyncResult ManagerImpl::add_member(group_id_t const& group_id, peer_id_t const& new_id) {
+NullAsyncResult ManagerImpl::add_member(group_id_t const& group_id, peer_id_t const& new_id, std::string const& aux,
+                                        bool is_learner, int32_t priority) {
     auto str_id = to_string(new_id);
-    return _mesg_service->add_member(group_id, nuraft::srv_config(to_server_id(new_id), str_id))
+    LOGI("add_member: [group={}, my_id={}, endpoint={}, aux={}, is_learner={}, priority={}]", group_id, str_id, new_id,
+         aux, is_learner, priority);
+    return _mesg_service
+        ->add_member(
+            group_id,
+            nuraft::srv_config(to_server_id(new_id), 0 /* DC ID we dont use now*/, str_id, aux, is_learner, priority))
         .deferValue([this, g_id = group_id, n_id = std::move(str_id)](auto cmd_result) mutable -> NullResult {
             if (!cmd_result) return folly::makeUnexpected(cmd_result.error());
             // TODO This should not block, but attach a new promise!
@@ -266,7 +283,9 @@ NullAsyncResult ManagerImpl::rem_member(group_id_t const& group_id, peer_id_t co
 NullAsyncResult ManagerImpl::become_leader(group_id_t const& group_id) {
     {
         auto lk = std::unique_lock< std::mutex >(_manager_lock);
-        if (_is_leader[group_id]) { return folly::Unit(); }
+        if (_is_leader[group_id]) {
+            return folly::Unit();
+        }
     }
 
     return folly::makeSemiFuture< folly::Unit >(folly::Unit())
@@ -367,7 +386,9 @@ void ManagerImpl::leave_group(group_id_t const& group_id) {
 
 uint32_t ManagerImpl::logstore_id(group_id_t const& group_id) const {
     std::lock_guard< std::mutex > lg(_manager_lock);
-    if (auto it = _state_managers.find(group_id); _state_managers.end() != it) { return it->second->get_logstore_id(); }
+    if (auto it = _state_managers.find(group_id); _state_managers.end() != it) {
+        return it->second->get_logstore_id();
+    }
     return UINT32_MAX;
 }
 
